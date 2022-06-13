@@ -24,11 +24,11 @@ class CudnnConvFwdAlgo(Enum):
   FASTEST = -1
 
 # create dummy input, convolutional weights and bias
-B, F, C, N = 4, 8, 3, 32
-input  = torch.zeros(B, C, 32, 32).to('cuda')
-weight = torch.zeros(F, C, 5, 5).to('cuda')
-output = torch.zeros(B, F, 28, 28).to('cuda')
-# output = torch.zeros(128, 64, 148 14).to('cuda')
+B, F, C = 128, 64, 3
+N, K, O = 32, 5, 28
+input  = torch.zeros(B, C, N, N).to('cuda')
+weight = torch.zeros(F, C, K, K).to('cuda')
+output = torch.zeros(B, F, O, O).to('cuda')
 
 stride   = (1, 1)
 padding  = (0, 0)
@@ -38,6 +38,7 @@ groups   = 1
 # compute the result of convolution
 output = cudnn_convolution.convolution(
   CudnnConvFwdAlgo.FASTEST.value,
+  # CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM.value,
   # CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_GEMM.value, 
   # CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_FFT.value, 
   input, weight, output, stride, padding, dilation, groups, False, False, True)

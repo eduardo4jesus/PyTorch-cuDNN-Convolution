@@ -113,6 +113,10 @@ at::Tensor convolution(const int fwdAlgo, const at::Tensor &input, const at::Ten
   cudnnConvolutionFwdAlgoPerf_t convolution_algorithm[CUDNN_CONVOLUTION_FWD_ALGO_COUNT];
   int returnedAlgoCount;
 
+  /**
+   * TODO: I frequently get segmentation fault when finding the convolution
+   * algorithms. I am not sure how to fix it.
+   */
   if (fwdAlgo == -1) {
     std::cout << "Trying all" << std::endl;
     checkCUDNN(
@@ -124,22 +128,23 @@ at::Tensor convolution(const int fwdAlgo, const at::Tensor &input, const at::Ten
                                           /*requestedAlgoCount*/CUDNN_CONVOLUTION_FWD_ALGO_COUNT,
                                           &returnedAlgoCount,
                                           convolution_algorithm));
-
-
     if (verbose)
       for (int i=0; i<returnedAlgoCount; i++)
         std::cout << convolution_algorithm[i] << std::endl;
-
   } else {
-    std::cout << "Defined Algo" << std::endl;
     convolution_algorithm[0].algo = static_cast<cudnnConvolutionFwdAlgo_t>(fwdAlgo);
     convolution_algorithm[0].status = static_cast<cudnnStatus_t>(0); 
     convolution_algorithm[0].time = -1;
     convolution_algorithm[0].memory = 0;
     convolution_algorithm[0].mathType = static_cast<cudnnMathType_t>(0);
-    if (verbose)
+    if (verbose) {
+      std::cout << "Attempt with defined Algo:" << std::endl;
       std::cout << convolution_algorithm[0] << std::endl;
+    }
   }
+
+  if (verbose)
+    std::cout << "Allocating Workspace" << std::endl;
 
   size_t workspace_bytes{0};
   checkCUDNN(cudnnGetConvolutionForwardWorkspaceSize(cudnn,
@@ -189,16 +194,6 @@ at::Tensor convolution(const int fwdAlgo, const at::Tensor &input, const at::Ten
   cudnnDestroyConvolutionDescriptor(args.cdesc);
 
   return output;
-  // return at::cudnn_convolution(
-  //     input,
-  //     weight,
-  //     bias,
-  //     padding,
-  //     stride,
-  //     dilation,
-  //     groups,
-  //     benchmark,
-  //     deterministic);
 }
 
 // at::Tensor convolution_backward_weight(
