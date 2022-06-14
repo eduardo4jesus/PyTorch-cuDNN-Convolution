@@ -229,7 +229,7 @@ void initialize_descriptors(const at::Tensor &input, const at::Tensor &weight, c
 
   checkCUDNN(cudnnCreateTensorDescriptor(&desc.output));
   checkCUDNN(cudnnSetTensor4dDescriptor(desc.output,
-                                        /*format=*/CUDNN_TENSOR_NHWC,
+                                        /*format=*/CUDNN_TENSOR_NCHW,
                                         /*dataType=*/at::native::getCudnnDataTypeFromScalarType(output.scalar_type()),
                                         /*batch_size=*/batch_size,
                                         /*channels=*/channels,
