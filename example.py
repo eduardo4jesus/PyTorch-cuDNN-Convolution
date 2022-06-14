@@ -1,37 +1,27 @@
 import torch
 from torch.utils.cpp_extension import load
-from enum import Enum
+from cudnn_convolution import CudnnConvFwdAlgo, CudnnConvBwdFilterAlgo, CudnnConvBwdDataAlgo
 
 # load the PyTorch extension
 cudnn_convolution = load(
   name="cudnn_convolution",
-  sources=["cudnn_convolution.cpp"],
+  sources=["cudnn_convolution.cpp", "cudnn_utils.cpp"],
   extra_ldflags = ["-lcudnn"],
   with_cuda=True,
   verbose=True
 )
 print("Compiled and Loaded!")
 
-class CudnnConvFwdAlgo(Enum):
-  CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM         = 0
-  CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM = 1
-  CUDNN_CONVOLUTION_FWD_ALGO_GEMM                  = 2
-  CUDNN_CONVOLUTION_FWD_ALGO_DIRECT                = 3
-  CUDNN_CONVOLUTION_FWD_ALGO_FFT                   = 4
-  CUDNN_CONVOLUTION_FWD_ALGO_FFT_TILING            = 5
-  CUDNN_CONVOLUTION_FWD_ALGO_WINOGRAD              = 6
-  CUDNN_CONVOLUTION_FWD_ALGO_WINOGRAD_NONFUSED     = 7
-  FASTEST = -1
 
 # create dummy input, convolutional weights and bias
-B, F, C = 128, 64, 3
-N, K, O = 32, 5, 28
+B, F, C = 8, 512, 512
+N, K, O = 32, 5, 32
 input  = torch.zeros(B, C, N, N).to('cuda')
 weight = torch.zeros(F, C, K, K).to('cuda')
 output = torch.zeros(B, F, O, O).to('cuda')
 
 stride   = (1, 1)
-padding  = (0, 0)
+padding  = (2, 2)
 dilation = (1, 1)
 groups   = 1
 
