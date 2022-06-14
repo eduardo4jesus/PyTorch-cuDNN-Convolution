@@ -27,9 +27,10 @@ Adapted from code posted by goldsborough/conv.cu:
 https://gist.github.com/eduardo4jesus/33ef6d8696e8af70a3046e9f364a65f8#file-conv-cu
 */
 
-at::Tensor convolution(const int fwdAlgo, const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
-                       c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding, c10::ArrayRef<int64_t> dilation,
-                       int64_t groups, bool benchmark, bool deterministic, bool verbose)
+at::Tensor convolution(const int fwdAlgo,
+                       const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
+                       c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding,
+                       c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
   cudnnDescriptors_t desc;
@@ -133,9 +134,10 @@ at::Tensor convolution(const int fwdAlgo, const at::Tensor &input, const at::Ten
   return output;
 }
 
-at::Tensor convolution_backward_weight(const int bwdFilterAlgo, const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
-                       c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding, c10::ArrayRef<int64_t> dilation,
-                       int64_t groups, bool benchmark, bool deterministic, bool verbose)
+at::Tensor convolution_backward_weight(const int bwdFilterAlgo,
+                                       const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
+                                       c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding, 
+                                       c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
   cudnnDescriptors_t desc;
@@ -240,9 +242,10 @@ at::Tensor convolution_backward_weight(const int bwdFilterAlgo, const at::Tensor
   return output;
 }
 
-at::Tensor convolution_backward_input(const int bwdDataAlgo, const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
-                       c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding, c10::ArrayRef<int64_t> dilation,
-                       int64_t groups, bool benchmark, bool deterministic, bool verbose)
+at::Tensor convolution_backward_input(const int bwdDataAlgo,
+                                      const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
+                                      c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding,
+                                      c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
   cudnnDescriptors_t desc;
