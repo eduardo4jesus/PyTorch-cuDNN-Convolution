@@ -98,6 +98,9 @@ at::Tensor convolution(const int fwdAlgo,
   void *d_workspace{nullptr};
   cudaMalloc(&d_workspace, workspace_bytes);
 
+  if (verbose)
+    std::cout << "Allocated: " << (workspace_bytes) << " Bytes" << std::endl;
+
   /*****************************************************************************
    * 4. Get and Allocate Memory for Workspace
    ****************************************************************************/

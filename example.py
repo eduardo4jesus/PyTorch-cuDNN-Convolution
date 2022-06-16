@@ -12,26 +12,27 @@ cudnn_convolution = load(
 )
 print("Compiled and Loaded!")
 
+# B, F, C = 128, 32, 3
+# N, K, O = 32, 3, 30
+# padding  = (0, 0)
+
+B, F, C = 256, 512, 512
+#B, F, C = 256, 512, 256
+N, K, O = 32, 5, 32
+padding  = (2, 2)
 
 # create dummy input, convolutional weights and bias
-B, F, C = 8, 32, 3
-N, K, O = 32, 5, 28
 input  = torch.zeros(B, C, N, N).to('cuda')
 weight = torch.zeros(F, C, K, K).to('cuda')
 output = torch.zeros(B, F, O, O).to('cuda')
-# print(input.dtype, weight.dtype, output.dtype)
-
 stride   = (1, 1)
-padding  = (0, 0)
 dilation = (1, 1)
 groups   = 1
 
 # compute the result of convolution
 output = cudnn_convolution.convolution(
   # CudnnConvFwdAlgo.FASTEST.value,
-  # CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM.value,
-  # CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_GEMM.value, 
-  CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_FFT.value, 
+  CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_FFT.value,
   input, weight, output, stride, padding, dilation, groups, True)
 
 print("Done!")
