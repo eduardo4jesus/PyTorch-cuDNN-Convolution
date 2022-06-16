@@ -1,4 +1,14 @@
 from enum import Enum
+from torch.utils.cpp_extension import load
+import os
+import torch
+
+__all__ = [
+  'CudnnConvFwdAlgo',
+  'CudnnConvBwdFilterAlgo',
+  'CudnnConvBwdDataAlgo',
+  'cudnn_convolution_fwd'
+]
 
 class CudnnConvFwdAlgo(Enum):
   ## This algorithm expresses the convolution as a matrix product without
@@ -117,3 +127,45 @@ class CudnnConvBwdDataAlgo(Enum):
 
   ## Look for the fastest method and try to uses it.
   FASTEST = -1
+
+__cpp_ext__ = None
+def __lazzy_load__():
+  global __cpp_ext__
+  if __cpp_ext__ is None:
+    __cpp_ext__ = cudnn_convolution = load(
+      name="cudnn_convolution",
+      sources=["cudnn_convolution.cpp", "cudnn_utils.cpp"],
+      extra_ldflags = ["-lcudnn"],
+      with_cuda=True,
+      verbose=True
+    )
+    print(f"{os.path.basename(__file__)}: Cpp Extension Compiled and Loaded!")
+  return __cpp_ext__
+
+def __pair__(v):
+  if type(v) is int:
+    return (v, v)
+  elif type(v) is tuple:
+    return v
+  else:
+    raise TypeError("Wrong Type")
+
+def cudnn_convolution_fwd(cudnn_fwd_algo, input, weight, output=None, padding=0, stride=1, dilation=1, groups=1, verbose=False):
+  cudnn_convolution = __lazzy_load__()
+
+  padding = __pair__(padding)
+  stride = __pair__(stride)
+  dilation = __pair__(dilation)
+  assert(cudnn_fwd_algo in CudnnConvFwdAlgo)
+
+  if output is None:
+    B, C, H, W = input.shape
+    F, _, K, L = weight.shape
+    OH = int(((H-K+2*padding[0])/stride[0])+1)
+    OW = int(((W-L+2*padding[1])/stride[1])+1)
+    output = torch.zeros((B, F, OH, OW), dtype=input.dtype).to(input.device)
+
+  return cudnn_convolution.convolution(
+    cudnn_fwd_algo.value, input, weight, output,
+    stride, padding, dilation, groups, verbose
+  )

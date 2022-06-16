@@ -27,12 +27,28 @@ Adapted from code posted by goldsborough/conv.cu:
 https://gist.github.com/eduardo4jesus/33ef6d8696e8af70a3046e9f364a65f8#file-conv-cu
 */
 
+std::ostream &cout_unit(std::ostream &out, const size_t &nbytes) {
+  if ((nbytes / (1u<<30)) > 1)
+    out << nbytes/(1u<<30) << " GB";
+  else if ((nbytes / (1u<<20)) > 1)
+    out << nbytes/(1u<<20) << " MB";
+  else if ((nbytes / (1u<<10)) > 1)
+    out << nbytes/(1u<<10) << " KB";
+
+  out << " (" << nbytes << " Bytes)";
+  return out;
+}
+
 at::Tensor convolution(const int fwdAlgo,
                        const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
                        c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding,
                        c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
+
+  /*****************************************************************************
+   * 1. Initializing Descriptors
+   ****************************************************************************/
   cudnnDescriptors_t desc;
   initialize_descriptors(input, weight, output, stride, padding, dilation, desc);
 
@@ -42,13 +58,11 @@ at::Tensor convolution(const int fwdAlgo,
   cudnnConvolutionFwdAlgoPerf_t convolution_algorithm[CUDNN_CONVOLUTION_FWD_ALGO_COUNT];
   int returnedAlgoCount;
 
-  /**
-   * TODO: I frequently get segmentation fault when finding the convolution
-   * algorithms. I am not sure how to fix it.
-   */
   if (fwdAlgo == -1)
   {
-    std::cout << "Trying all" << std::endl;
+    if (verbose)
+      std::cout << "Trying all" << std::endl;
+
     checkCUDNN(
         cudnnFindConvolutionForwardAlgorithm(/*handle*/ cudnn,
                                              /*xDesc*/ desc.input,
@@ -92,23 +106,30 @@ at::Tensor convolution(const int fwdAlgo,
                                                      /*algo*/ convolution_algorithm[0].algo,
                                                      /*sizeInBytes*/ &workspace_bytes));
 
-  if (verbose)
-    std::cout << "Workspace size: " << (workspace_bytes) << " Bytes" << std::endl;
+  /*****************************************************************************
+   * 4. Get and Allocate Memory for Workspace
+   ****************************************************************************/
+  if (verbose) {
+    std::cout << "Workspace size: ";
+    cout_unit(std::cout, workspace_bytes) << std::endl;
+  }
 
   void *d_workspace{nullptr};
   cudaMalloc(&d_workspace, workspace_bytes);
 
-  if (verbose)
-    std::cout << "Allocated: " << (workspace_bytes) << " Bytes" << std::endl;
+  if (verbose) {
+    std::cout << "Allocated size: ";
+    cout_unit(std::cout, workspace_bytes) << std::endl;
+  }
 
   /*****************************************************************************
-   * 4. Get and Allocate Memory for Workspace
+   * 5. Call CuDNN Convolution
    ****************************************************************************/
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  // cudaEvent_t start, stop;
+  // cudaEventCreate(&start);
+  // cudaEventCreate(&stop);
 
-  cudaEventRecord(start);
+  // cudaEventRecord(start);
   const float alpha = 1.0f, beta = 0.0f;
   checkCUDNN(cudnnConvolutionForward(cudnn,
                                      /*alpha*/ &alpha,
@@ -123,12 +144,12 @@ at::Tensor convolution(const int fwdAlgo,
                                      /*beta*/ &beta,
                                      /*yDesc*/ desc.output,
                                      /*y*/ output.data_ptr()));
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  float milliseconds{0};
-  cudaEventElapsedTime(&milliseconds, start, stop);
-  if (verbose)
-    std::cout << "Elapsed Time: " << milliseconds << " ms" << std::endl;
+  // cudaEventRecord(stop);
+  // cudaEventSynchronize(stop);
+  // float milliseconds{0};
+  // cudaEventElapsedTime(&milliseconds, start, stop);
+  // if (verbose)
+  //   std::cout << "Elapsed Time: " << milliseconds << " ms" << std::endl;
 
   /*****************************************************************************
    * 5. Freeing variables
@@ -143,6 +164,10 @@ at::Tensor convolution_backward_weight(const int bwdFilterAlgo,
                                        c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
+
+  /*****************************************************************************
+   * 1. Initializing Descriptors
+   ****************************************************************************/
   cudnnDescriptors_t desc;
   initialize_descriptors(input, weight, output, stride, padding, dilation, desc);
 
@@ -152,13 +177,11 @@ at::Tensor convolution_backward_weight(const int bwdFilterAlgo,
   cudnnConvolutionBwdFilterAlgoPerf_t convolution_algorithm[CUDNN_CONVOLUTION_BWD_FILTER_ALGO_COUNT];
   int returnedAlgoCount;
 
-  /**
-   * TODO: I frequently get segmentation fault when finding the convolution
-   * algorithms. I am not sure how to fix it.
-   */
   if (bwdFilterAlgo == -1)
   {
-    std::cout << "Trying all" << std::endl;
+    if (verbose)
+      std::cout << "Trying all" << std::endl;
+
     checkCUDNN(
         cudnnFindConvolutionBackwardFilterAlgorithm(/*handle*/ cudnn,
                                              /*xDesc*/ desc.input,
@@ -202,20 +225,30 @@ at::Tensor convolution_backward_weight(const int bwdFilterAlgo,
                                                      /*algo*/ convolution_algorithm[0].algo,
                                                      /*sizeInBytes*/ &workspace_bytes));
 
-  if (verbose)
-    std::cout << "Workspace size: " << (workspace_bytes) << " Bytes" << std::endl;
+  /*****************************************************************************
+   * 4. Get and Allocate Memory for Workspace
+   ****************************************************************************/
+  if (verbose) {
+    std::cout << "Workspace size: ";
+    cout_unit(std::cout, workspace_bytes) << std::endl;
+  }
 
   void *d_workspace{nullptr};
   cudaMalloc(&d_workspace, workspace_bytes);
 
-  /*****************************************************************************
-   * 4. Get and Allocate Memory for Workspace
-   ****************************************************************************/
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  if (verbose) {
+    std::cout << "Allocated size: ";
+    cout_unit(std::cout, workspace_bytes) << std::endl;
+  }
 
-  cudaEventRecord(start);
+  /*****************************************************************************
+   * Call CuDNN Convolution
+   ****************************************************************************/
+  // cudaEvent_t start, stop;
+  // cudaEventCreate(&start);
+  // cudaEventCreate(&stop);
+
+  // cudaEventRecord(start);
   const float alpha = 1.0f, beta = 0.0f;
   checkCUDNN(cudnnConvolutionBackwardFilter(cudnn,
                                      /*alpha*/ &alpha,
@@ -231,12 +264,12 @@ at::Tensor convolution_backward_weight(const int bwdFilterAlgo,
                                      /*dwDesc*/ desc.weight,
                                      /*dw*/ weight.data_ptr()
                                      ));
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  float milliseconds{0};
-  cudaEventElapsedTime(&milliseconds, start, stop);
-  if (verbose)
-    std::cout << "Elapsed Time: " << milliseconds << " ms" << std::endl;
+  // cudaEventRecord(stop);
+  // cudaEventSynchronize(stop);
+  // float milliseconds{0};
+  // cudaEventElapsedTime(&milliseconds, start, stop);
+  // if (verbose)
+  //   std::cout << "Elapsed Time: " << milliseconds << " ms" << std::endl;
 
   /*****************************************************************************
    * 5. Freeing variables
@@ -251,6 +284,10 @@ at::Tensor convolution_backward_input(const int bwdDataAlgo,
                                       c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
+
+  /*****************************************************************************
+   * 1. Initializing Descriptors
+   ****************************************************************************/
   cudnnDescriptors_t desc;
   initialize_descriptors(input, weight, output, stride, padding, dilation, desc);
 
@@ -266,7 +303,9 @@ at::Tensor convolution_backward_input(const int bwdDataAlgo,
    */
   if (bwdDataAlgo == -1)
   {
-    std::cout << "Trying all" << std::endl;
+    if (verbose)
+      std::cout << "Trying all" << std::endl;
+
     checkCUDNN(
         cudnnFindConvolutionBackwardDataAlgorithm(/*handle*/ cudnn,
                                              /*wDesc*/ desc.weight,
@@ -310,20 +349,30 @@ at::Tensor convolution_backward_input(const int bwdDataAlgo,
                                                      /*algo*/ convolution_algorithm[0].algo,
                                                      /*sizeInBytes*/ &workspace_bytes));
 
-  if (verbose)
-    std::cout << "Workspace size: " << (workspace_bytes) << " Bytes" << std::endl;
+  /*****************************************************************************
+   * 4. Get and Allocate Memory for Workspace
+   ****************************************************************************/
+  if (verbose) {
+    std::cout << "Workspace size: ";
+    cout_unit(std::cout, workspace_bytes) << std::endl;
+  }
 
   void *d_workspace{nullptr};
   cudaMalloc(&d_workspace, workspace_bytes);
 
-  /*****************************************************************************
-   * 4. Get and Allocate Memory for Workspace
-   ****************************************************************************/
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
+  if (verbose) {
+    std::cout << "Allocated size: ";
+    cout_unit(std::cout, workspace_bytes) << std::endl;
+  }
 
-  cudaEventRecord(start);
+  /*****************************************************************************
+   * 5. Call CuDNN Convolution
+   ****************************************************************************/
+  // cudaEvent_t start, stop;
+  // cudaEventCreate(&start);
+  // cudaEventCreate(&stop);
+
+  // cudaEventRecord(start);
   const float alpha = 1.0f, beta = 0.0f;
   checkCUDNN(cudnnConvolutionBackwardData(cudnn,
                                      /*alpha*/ &alpha,
@@ -338,12 +387,12 @@ at::Tensor convolution_backward_input(const int bwdDataAlgo,
                                      /*beta*/ &beta,
                                      /*xDesc*/ desc.input,
                                      /*x*/ input.data_ptr()));
-  cudaEventRecord(stop);
-  cudaEventSynchronize(stop);
-  float milliseconds{0};
-  cudaEventElapsedTime(&milliseconds, start, stop);
-  if (verbose)
-    std::cout << "Elapsed Time: " << milliseconds << " ms" << std::endl;
+  // cudaEventRecord(stop);
+  // cudaEventSynchronize(stop);
+  // float milliseconds{0};
+  // cudaEventElapsedTime(&milliseconds, start, stop);
+  // if (verbose)
+  //   std::cout << "Elapsed Time: " << milliseconds << " ms" << std::endl;
 
   /*****************************************************************************
    * 5. Freeing variables

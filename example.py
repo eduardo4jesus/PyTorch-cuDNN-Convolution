@@ -1,39 +1,17 @@
 import torch
 from torch.utils.cpp_extension import load
-from cudnn_convolution import CudnnConvFwdAlgo, CudnnConvBwdFilterAlgo, CudnnConvBwdDataAlgo
+from cudnn_convolution import *
 
-# load the PyTorch extension
-cudnn_convolution = load(
-  name="cudnn_convolution",
-  sources=["cudnn_convolution.cpp", "cudnn_utils.cpp"],
-  extra_ldflags = ["-lcudnn"],
-  with_cuda=True,
-  verbose=True
-)
-print("Compiled and Loaded!")
-
-# B, F, C = 128, 32, 3
-# N, K, O = 32, 3, 30
-# padding  = (0, 0)
-
-B, F, C = 256, 512, 512
-#B, F, C = 256, 512, 256
+B, F, C = 256, 512, 128
 N, K, O = 32, 5, 32
-padding  = (2, 2)
 
-# create dummy input, convolutional weights and bias
 input  = torch.zeros(B, C, N, N).to('cuda')
 weight = torch.zeros(F, C, K, K).to('cuda')
-output = torch.zeros(B, F, O, O).to('cuda')
-stride   = (1, 1)
-dilation = (1, 1)
-groups   = 1
 
-# compute the result of convolution
-output = cudnn_convolution.convolution(
-  # CudnnConvFwdAlgo.FASTEST.value,
-  CudnnConvFwdAlgo.CUDNN_CONVOLUTION_FWD_ALGO_FFT.value,
-  input, weight, output, stride, padding, dilation, groups, True)
+output = cudnn_convolution_fwd(
+  CudnnConvFwdAlgo.FASTEST,
+  input, weight, padding=2, verbose=True
+)
 
 print("Done!")
 # # create dummy gradient w.r.t. the output
