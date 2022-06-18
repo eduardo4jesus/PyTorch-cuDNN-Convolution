@@ -8,6 +8,72 @@
 #include "cudnn_utils.h"
 #include <ATen/cudnn/Types.h>      // for getCudnnDataType
 
+void initialize_descriptors(const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
+                            c10::ArrayRef<int64_t> &stride,
+                            c10::ArrayRef<int64_t> &padding,
+                            c10::ArrayRef<int64_t> &dilation,
+                            cudnnDescriptors_t &desc)
+{
+  /*****************************************************************************
+   * 1. Initializing Descriptors
+   ****************************************************************************/
+  assert(input.dim() == 4);
+  checkCUDNN(cudnnCreateTensorDescriptor(&desc.input));
+  checkCUDNN(cudnnSetTensor4dDescriptor(desc.input,
+                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*dataType=*/at::native::getCudnnDataTypeFromScalarType(input.scalar_type()),
+                                        /*batch_size=*/input.size(0),
+                                        /*channels=*/input.size(1),
+                                        /*image_height=*/input.size(2),
+                                        /*image_width=*/input.size(3)));
+
+  assert(weight.dim() == 4);
+  checkCUDNN(cudnnCreateFilterDescriptor(&desc.weight));
+  checkCUDNN(cudnnSetFilter4dDescriptor(desc.weight,
+                                        /*dataType=*/at::native::getCudnnDataTypeFromScalarType(weight.scalar_type()),
+                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*out_channels=*/weight.size(0),
+                                        /*in_channels=*/weight.size(1),
+                                        /*kernel_height=*/weight.size(2),
+                                        /*kernel_width=*/weight.size(3)));
+
+  checkCUDNN(cudnnCreateConvolutionDescriptor(&desc.convolution));
+  checkCUDNN(cudnnSetConvolution2dDescriptor(desc.convolution,
+                                             /*pad_height=*/padding[0],
+                                             /*pad_width=*/padding[1],
+                                             /*vertical_stride=*/stride[0],
+                                             /*horizontal_stride=*/stride[1],
+                                             /*dilation_height=*/dilation[0],
+                                             /*dilation_width=*/dilation[1],
+                                             /*mode=*/CUDNN_CROSS_CORRELATION,
+                                             /*computeType=*/at::native::getCudnnDataTypeFromScalarType(output.scalar_type())));
+
+  int batch_size{0}, channels{0}, height{0}, width{0};
+  checkCUDNN(cudnnGetConvolution2dForwardOutputDim(desc.convolution,
+                                                   desc.input,
+                                                   desc.weight,
+                                                   &batch_size,
+                                                   &channels,
+                                                   &height,
+                                                   &width));
+
+  assert(batch_size == output.size(0) && channels == output.size(1) &&
+    height == output.size(2) && width == output.size(3));
+
+  checkCUDNN(cudnnCreateTensorDescriptor(&desc.output));
+  checkCUDNN(cudnnSetTensor4dDescriptor(desc.output,
+                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*dataType=*/at::native::getCudnnDataTypeFromScalarType(output.scalar_type()),
+                                        /*batch_size=*/batch_size,
+                                        /*channels=*/channels,
+                                        /*image_height=*/height,
+                                        /*image_width=*/width));
+
+  desc.B = input.size(0); desc.C = input.size(1); desc.H = input.size(1); desc.W = input.size(1);
+  desc.F = weight.size(0); desc.KH = weight.size(2); desc.KW = weight.size(3);
+  desc.OH = output.size(2); desc.OW = output.size(3);
+}
+
 std::ostream &operator<<(std::ostream &out, const cudnnConvolutionFwdAlgo_t &algo)
 {
   out << "FWD Algorithm: ";
@@ -175,66 +241,12 @@ std::ostream& operator<<(std::ostream &out, const cudnnConvolutionBwdDataAlgoPer
   return out;
 }
 
-void initialize_descriptors(const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
-                            c10::ArrayRef<int64_t> &stride,
-                            c10::ArrayRef<int64_t> &padding,
-                            c10::ArrayRef<int64_t> &dilation,
-                            cudnnDescriptors_t &desc)
-{
-  /*****************************************************************************
-   * 1. Initializing Descriptors
-   ****************************************************************************/
-  assert(input.dim() == 4);
-  checkCUDNN(cudnnCreateTensorDescriptor(&desc.input));
-  checkCUDNN(cudnnSetTensor4dDescriptor(desc.input,
-                                        /*format=*/CUDNN_TENSOR_NCHW,
-                                        /*dataType=*/at::native::getCudnnDataTypeFromScalarType(input.scalar_type()),
-                                        /*batch_size=*/input.size(0),
-                                        /*channels=*/input.size(1),
-                                        /*image_height=*/input.size(2),
-                                        /*image_width=*/input.size(3)));
-
-  assert(weight.dim() == 4);
-  checkCUDNN(cudnnCreateFilterDescriptor(&desc.weight));
-  checkCUDNN(cudnnSetFilter4dDescriptor(desc.weight,
-                                        /*dataType=*/at::native::getCudnnDataTypeFromScalarType(weight.scalar_type()),
-                                        /*format=*/CUDNN_TENSOR_NCHW,
-                                        /*out_channels=*/weight.size(0),
-                                        /*in_channels=*/weight.size(1),
-                                        /*kernel_height=*/weight.size(2),
-                                        /*kernel_width=*/weight.size(3)));
-
-  checkCUDNN(cudnnCreateConvolutionDescriptor(&desc.convolution));
-  checkCUDNN(cudnnSetConvolution2dDescriptor(desc.convolution,
-                                             /*pad_height=*/padding[0],
-                                             /*pad_width=*/padding[1],
-                                             /*vertical_stride=*/stride[0],
-                                             /*horizontal_stride=*/stride[1],
-                                             /*dilation_height=*/dilation[0],
-                                             /*dilation_width=*/dilation[1],
-                                             /*mode=*/CUDNN_CROSS_CORRELATION,
-                                             /*computeType=*/at::native::getCudnnDataTypeFromScalarType(output.scalar_type())));
-
-  int batch_size{0}, channels{0}, height{0}, width{0};
-  checkCUDNN(cudnnGetConvolution2dForwardOutputDim(desc.convolution,
-                                                   desc.input,
-                                                   desc.weight,
-                                                   &batch_size,
-                                                   &channels,
-                                                   &height,
-                                                   &width));
-
-  assert(batch_size == output.size(0) && channels == output.size(1) &&
-    height == output.size(2) && width == output.size(3));
-
-  checkCUDNN(cudnnCreateTensorDescriptor(&desc.output));
-  checkCUDNN(cudnnSetTensor4dDescriptor(desc.output,
-                                        /*format=*/CUDNN_TENSOR_NCHW,
-                                        /*dataType=*/at::native::getCudnnDataTypeFromScalarType(output.scalar_type()),
-                                        /*batch_size=*/batch_size,
-                                        /*channels=*/channels,
-                                        /*image_height=*/height,
-                                        /*image_width=*/width));
+std::ostream& operator<<(std::ostream &out, const cudnnDescriptors_t &desc) {
+  out << "Descriptors:";
+  out << " input(" << desc.B << ", " << desc.C << ", " << desc.H << ", " << desc.W << ")";
+  out << " weight(" << desc.F << ", " << desc.C << ", " << desc.KH << ", " << desc.KW << ")";
+  out << " output(" << desc.B << ", " << desc.F << ", " << desc.OH << ", " << desc.OW << ").";
+  return out;
 }
 
 #endif
