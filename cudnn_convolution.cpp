@@ -8,7 +8,14 @@
 #include <cudnn.h>
 #include <torch/extension.h>
 #include <ATen/cudnn/Handle.h> // for getCudnnHandle
+#include <nvToolsExt.h> // For nvtxRangePush and nvtxRangePop; link with -lnvToolsExt
 #include "cudnn_utils.h"
+
+#ifdef ALLOW_ANNOTATION
+#define annotation(expression) expression
+#else
+#define annotation(expression)
+#endif
 
 /*
 PyTorch extension enabling direct access to the following cuDNN-accelerated C++ functions
@@ -49,8 +56,10 @@ at::Tensor convolution(const int fwdAlgo,
   /*****************************************************************************
    * 1. Initializing Descriptors
    ****************************************************************************/
+  annotation(nvtxRangePush("Initializing Descriptors"));
   cudnnDescriptors_t desc;
   initialize_descriptors(input, weight, output, stride, padding, dilation, desc);
+  annotation(nvtxRangePop());
 
   /*****************************************************************************
    * 2. Setting FWD Convolution Algo
@@ -97,6 +106,7 @@ at::Tensor convolution(const int fwdAlgo,
   if (verbose)
     std::cout << "Allocating Workspace" << std::endl;
 
+  annotation(nvtxRangePush("Computing Workspace Mem Size"));
   size_t workspace_bytes{0};
   checkCUDNN(cudnnGetConvolutionForwardWorkspaceSize(cudnn,
                                                      /*xDesc*/ desc.input,
@@ -105,6 +115,7 @@ at::Tensor convolution(const int fwdAlgo,
                                                      /*yDesc*/ desc.output,
                                                      /*algo*/ convolution_algorithm[0].algo,
                                                      /*sizeInBytes*/ &workspace_bytes));
+  annotation(nvtxRangePop());
 
   /*****************************************************************************
    * 4. Get and Allocate Memory for Workspace
@@ -114,8 +125,10 @@ at::Tensor convolution(const int fwdAlgo,
     cout_unit(std::cout, workspace_bytes) << std::endl;
   }
 
+  annotation(nvtxRangePush("Allocating Workspace"));
   void *d_workspace{nullptr};
   cudaMalloc(&d_workspace, workspace_bytes);
+  annotation(nvtxRangePop());
 
   if (verbose) {
     std::cout << "Allocated size: ";
@@ -130,6 +143,7 @@ at::Tensor convolution(const int fwdAlgo,
   // cudaEventCreate(&stop);
 
   // cudaEventRecord(start);
+  annotation(nvtxRangePush("Convolution"));
   const float alpha = 1.0f, beta = 0.0f;
   checkCUDNN(cudnnConvolutionForward(cudnn,
                                      /*alpha*/ &alpha,
@@ -144,6 +158,7 @@ at::Tensor convolution(const int fwdAlgo,
                                      /*beta*/ &beta,
                                      /*yDesc*/ desc.output,
                                      /*y*/ output.data_ptr()));
+  annotation(nvtxRangePop());
   // cudaEventRecord(stop);
   // cudaEventSynchronize(stop);
   // float milliseconds{0};
