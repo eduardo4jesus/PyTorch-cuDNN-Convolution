@@ -173,6 +173,57 @@ at::Tensor convolution(const int fwdAlgo,
   return output;
 }
 
+// void find_fwd_algo(const uint B, const uint F, const uint C, 
+at::Tensor find_fwd_algo(const uint B, const uint F, const uint C, 
+                         const uint H, const uint W, 
+                         const uint KH, const uint KW,
+                         const uint OH, const uint OW,
+                         c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding,
+                         c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
+{
+  const cudnnHandle_t cudnn = at::native::getCudnnHandle();
+
+  /*****************************************************************************
+   * 1. Initializing Descriptors
+   ****************************************************************************/
+  cudnnDescriptors_t desc;
+  initialize_descriptors(B, F, C, H, W, KH, KW, OH, OW, stride, padding, dilation, desc);
+
+  /*****************************************************************************
+   * 2. Setting FWD Convolution Algo
+   ****************************************************************************/
+  // std::vector<cudnnConvolutionFwdAlgoPerf_t> convolution_algorithm(CUDNN_CONVOLUTION_FWD_ALGO_COUNT);
+  cudnnConvolutionFwdAlgoPerf_t convolution_algorithm[CUDNN_CONVOLUTION_FWD_ALGO_COUNT];
+  int returnedAlgoCount;
+
+  if (verbose)
+    std::cout << "Trying all" << std::endl;
+
+  checkCUDNN(
+      cudnnFindConvolutionForwardAlgorithm(/*handle*/ cudnn,
+                                            /*xDesc*/ desc.input,
+                                            /*wDesc*/ desc.weight,
+                                            /*convDesc*/ desc.convolution,
+                                            /*yDesc*/ desc.output,
+                                            /*requestedAlgoCount*/ CUDNN_CONVOLUTION_FWD_ALGO_COUNT,
+                                            /*returnedAlgoCount*/ &returnedAlgoCount,
+                                            /*perfResults*/ convolution_algorithm));
+
+  at::Tensor output = torch::zeros({returnedAlgoCount, 4});
+  for (int i = 0; i < returnedAlgoCount; i++) {
+    if (verbose) {
+      std::cout << convolution_algorithm[i] << std::endl;
+    }
+
+    output.index({i, 0}) = static_cast<float>(convolution_algorithm[i].algo);
+    output.index({i, 1}) = static_cast<float>(convolution_algorithm[i].status);
+    output.index({i, 2}) = static_cast<float>(convolution_algorithm[i].time);
+    output.index({i, 3}) = static_cast<float>(convolution_algorithm[i].memory);
+  }
+
+  return output;
+}
+
 at::Tensor convolution_backward_weight(const int bwdFilterAlgo,
                                        const at::Tensor &input, const at::Tensor &weight, const at::Tensor &output,
                                        c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding, 
@@ -420,6 +471,7 @@ at::Tensor convolution_backward_input(const int bwdDataAlgo,
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
   m.def("convolution", &convolution, "convolution");
+  m.def("find_fwd_algo", &find_fwd_algo, "find forward algorithm");
   m.def("convolution_backward_weight", &convolution_backward_weight, "convolution backward weight");
   m.def("convolution_backward_input", &convolution_backward_input, "convolution backward input");
 }

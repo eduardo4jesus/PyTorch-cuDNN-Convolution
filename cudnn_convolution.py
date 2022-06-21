@@ -6,6 +6,9 @@ import torch
 
 __all__ = [
   'cudnn_convolution_fwd',
+  'cudnn_convolution_fwd_',
+  'cudnn_find_convolution_fwd_algo',
+  'cudnn_find_convolution_fwd_algo_',
   'CudnnConvFwdAlgo',
   'CudnnConvBwdFilterAlgo',
   'CudnnConvBwdDataAlgo',
@@ -21,7 +24,7 @@ def __lazzy_load__(verbose=False):
       sources=[f"{__parent__}/cudnn_convolution.cpp", f"{__parent__}/cudnn_utils.cpp"],
       extra_ldflags = ["-lcudnn", "-lnvToolsExt"],
       with_cuda=True,
-      verbose=True
+      verbose=verbose
     )
     if verbose:
       print(f"{os.path.basename(__file__)}: Cpp Extension Compiled and Loaded!")
@@ -35,8 +38,12 @@ def __pair__(v):
   else:
     raise TypeError("Wrong Type")
 
+def cudnn_convolution_fwd(algo, B, F, C, N, K, O, padding, verbose=True):
+  input  = torch.zeros(B, C, N, N).to('cuda')
+  weight = torch.zeros(F, C, K, K).to('cuda')
+  return cudnn_convolution_fwd_(algo, input, weight, padding=padding, verbose=verbose)
 
-def cudnn_convolution_fwd(cudnn_fwd_algo, input, weight, output=None, padding=0, stride=1, dilation=1, groups=1, verbose=False):
+def cudnn_convolution_fwd_(cudnn_fwd_algo, input, weight, output=None, padding=0, stride=1, dilation=1, groups=1, verbose=False):
   cudnn_convolution = __lazzy_load__(verbose)
 
   padding = __pair__(padding)
@@ -55,6 +62,30 @@ def cudnn_convolution_fwd(cudnn_fwd_algo, input, weight, output=None, padding=0,
     cudnn_fwd_algo.value, input, weight, output,
     stride, padding, dilation, groups, verbose
   )
+
+def cudnn_find_convolution_fwd_algo(B, F, C, N, K, O, padding=0, stride=1, dilation=1, groups=1, verbose=False):
+  return cudnn_find_convolution_fwd_algo_(B, F, C, N, N, K, K, O, O, padding, stride, dilation, groups, verbose)
+
+def cudnn_find_convolution_fwd_algo_(B, F, C, H, W, KH, KW, OH, OW, padding=0, stride=1, dilation=1, groups=1, verbose=False):
+  cudnn_convolution = __lazzy_load__(verbose)
+
+  padding = __pair__(padding)
+  stride = __pair__(stride)
+  dilation = __pair__(dilation)
+
+  algos = cudnn_convolution.find_fwd_algo(
+    B, F, C, H, W, KH, KW, OH, OW, stride, padding, dilation, groups, verbose
+  )
+
+  output = []
+  for a in algos:
+    algorithm = CudnnConvFwdAlgo(int(a[0]))
+    status = CudnnStatus(int(a[1]))
+    time = float(a[2])
+    memory = int(a[3])
+    output.append([algorithm, status, time, memory])
+
+  return output
 
 class CudnnConvFwdAlgo(Enum):
   ## This algorithm expresses the convolution as a matrix product without
@@ -174,3 +205,19 @@ class CudnnConvBwdDataAlgo(Enum):
   ## Look for the fastest method and try to uses it.
   FASTEST = -1
 
+class CudnnStatus(Enum):
+  CUDNN_STATUS_SUCCESS                      = 0
+  CUDNN_STATUS_NOT_INITIALIZED              = 1
+  CUDNN_STATUS_ALLOC_FAILED                 = 2
+  CUDNN_STATUS_BAD_PARAM                    = 3
+  CUDNN_STATUS_INTERNAL_ERROR               = 4
+  CUDNN_STATUS_INVALID_VALUE                = 5
+  CUDNN_STATUS_ARCH_MISMATCH                = 6
+  CUDNN_STATUS_MAPPING_ERROR                = 7
+  CUDNN_STATUS_EXECUTION_FAILED             = 8
+  CUDNN_STATUS_NOT_SUPPORTED                = 9
+  CUDNN_STATUS_LICENSE_ERROR                = 10
+  CUDNN_STATUS_RUNTIME_PREREQUISITE_MISSING = 11
+  CUDNN_STATUS_RUNTIME_IN_PROGRESS          = 12
+  CUDNN_STATUS_RUNTIME_FP_OVERFLOW          = 13
+  CUDNN_STATUS_VERSION_MISMATCH             = 14

@@ -74,6 +74,73 @@ void initialize_descriptors(const at::Tensor &input, const at::Tensor &weight, c
   desc.OH = output.size(2); desc.OW = output.size(3);
 }
 
+void initialize_descriptors(const uint B, const uint F, const uint C, 
+                            const uint H, const uint W, 
+                            const uint KH, const uint KW,
+                            const uint OH, const uint OW,
+                            c10::ArrayRef<int64_t> &stride,
+                            c10::ArrayRef<int64_t> &padding,
+                            c10::ArrayRef<int64_t> &dilation,
+                            cudnnDescriptors_t &desc,
+                            cudnnDataType_t dataType)
+{
+  /*****************************************************************************
+   * 1. Initializing Descriptors
+   ****************************************************************************/
+  checkCUDNN(cudnnCreateTensorDescriptor(&desc.input));
+  checkCUDNN(cudnnSetTensor4dDescriptor(desc.input,
+                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*dataType=*/dataType,
+                                        /*batch_size=*/B,
+                                        /*channels=*/C,
+                                        /*image_height=*/H,
+                                        /*image_width=*/W));
+
+  checkCUDNN(cudnnCreateFilterDescriptor(&desc.weight));
+  checkCUDNN(cudnnSetFilter4dDescriptor(desc.weight,
+                                        /*dataType=*/dataType,
+                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*out_channels=*/F,
+                                        /*in_channels=*/C,
+                                        /*kernel_height=*/KH,
+                                        /*kernel_width=*/KW));
+
+  checkCUDNN(cudnnCreateConvolutionDescriptor(&desc.convolution));
+  checkCUDNN(cudnnSetConvolution2dDescriptor(desc.convolution,
+                                             /*pad_height=*/padding[0],
+                                             /*pad_width=*/padding[1],
+                                             /*vertical_stride=*/stride[0],
+                                             /*horizontal_stride=*/stride[1],
+                                             /*dilation_height=*/dilation[0],
+                                             /*dilation_width=*/dilation[1],
+                                             /*mode=*/CUDNN_CROSS_CORRELATION,
+                                             /*computeType=*/dataType));
+
+  int batch_size{0}, channels{0}, height{0}, width{0};
+  checkCUDNN(cudnnGetConvolution2dForwardOutputDim(desc.convolution,
+                                                   desc.input,
+                                                   desc.weight,
+                                                   &batch_size,
+                                                   &channels,
+                                                   &height,
+                                                   &width));
+
+  assert(batch_size == B && channels == F && height == OH && width == OW);
+
+  checkCUDNN(cudnnCreateTensorDescriptor(&desc.output));
+  checkCUDNN(cudnnSetTensor4dDescriptor(desc.output,
+                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*dataType=*/dataType,
+                                        /*batch_size=*/batch_size,
+                                        /*channels=*/channels,
+                                        /*image_height=*/height,
+                                        /*image_width=*/width));
+
+  desc.B = B; desc.C = C; desc.H = H; desc.W = W;
+  desc.F = F; desc.KH = KH; desc.KW = KW;
+  desc.OH = OH; desc.OW = OW;
+}
+
 std::ostream &operator<<(std::ostream &out, const cudnnConvolutionFwdAlgo_t &algo)
 {
   out << "FWD Algorithm: ";
