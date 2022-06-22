@@ -50,7 +50,7 @@ void initialize_descriptors(const uint B, const uint F, const uint C,
                             c10::ArrayRef<int64_t> &stride,
                             c10::ArrayRef<int64_t> &padding,
                             c10::ArrayRef<int64_t> &dilation,
-                            cudnnDescriptors_t &descriptors,
+                            bool channel_first, cudnnDescriptors_t &descriptors,
                             cudnnDataType_t dataType = CUDNN_DATA_FLOAT);
 
 std::ostream& operator<<(std::ostream &out, const cudnnConvolutionFwdAlgoPerf_t &fwdAlgoPert);

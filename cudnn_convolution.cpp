@@ -179,7 +179,8 @@ at::Tensor find_fwd_algo(const uint B, const uint F, const uint C,
                          const uint KH, const uint KW,
                          const uint OH, const uint OW,
                          c10::ArrayRef<int64_t> stride, c10::ArrayRef<int64_t> padding,
-                         c10::ArrayRef<int64_t> dilation, int64_t groups, bool verbose)
+                         c10::ArrayRef<int64_t> dilation, int64_t groups,
+                         bool channel_first, bool verbose)
 {
   const cudnnHandle_t cudnn = at::native::getCudnnHandle();
 
@@ -187,7 +188,7 @@ at::Tensor find_fwd_algo(const uint B, const uint F, const uint C,
    * 1. Initializing Descriptors
    ****************************************************************************/
   cudnnDescriptors_t desc;
-  initialize_descriptors(B, F, C, H, W, KH, KW, OH, OW, stride, padding, dilation, desc);
+  initialize_descriptors(B, F, C, H, W, KH, KW, OH, OW, stride, padding, dilation, channel_first, desc);
 
   /*****************************************************************************
    * 2. Setting FWD Convolution Algo

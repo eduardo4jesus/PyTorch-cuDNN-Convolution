@@ -81,15 +81,16 @@ void initialize_descriptors(const uint B, const uint F, const uint C,
                             c10::ArrayRef<int64_t> &stride,
                             c10::ArrayRef<int64_t> &padding,
                             c10::ArrayRef<int64_t> &dilation,
-                            cudnnDescriptors_t &desc,
+                            bool channel_first, cudnnDescriptors_t &desc,
                             cudnnDataType_t dataType)
 {
+  cudnnTensorFormat_t format = channel_first ? CUDNN_TENSOR_NCHW : CUDNN_TENSOR_NHWC;
   /*****************************************************************************
    * 1. Initializing Descriptors
    ****************************************************************************/
   checkCUDNN(cudnnCreateTensorDescriptor(&desc.input));
   checkCUDNN(cudnnSetTensor4dDescriptor(desc.input,
-                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*format=*/format,
                                         /*dataType=*/dataType,
                                         /*batch_size=*/B,
                                         /*channels=*/C,
@@ -129,7 +130,7 @@ void initialize_descriptors(const uint B, const uint F, const uint C,
 
   checkCUDNN(cudnnCreateTensorDescriptor(&desc.output));
   checkCUDNN(cudnnSetTensor4dDescriptor(desc.output,
-                                        /*format=*/CUDNN_TENSOR_NCHW,
+                                        /*format=*/format,
                                         /*dataType=*/dataType,
                                         /*batch_size=*/batch_size,
                                         /*channels=*/channels,

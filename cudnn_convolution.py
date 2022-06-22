@@ -27,7 +27,7 @@ def __lazzy_load__(verbose=False):
       verbose=verbose
     )
     if verbose:
-      print(f"{os.path.basename(__file__)}: Cpp Extension Compiled and Loaded!")
+      print(f"{os.path.basename(__file__)}: Cpp CuDNN Extension Compiled and Loaded!")
   return __cpp_ext__
 
 def __pair__(v):
@@ -63,10 +63,10 @@ def cudnn_convolution_fwd_(cudnn_fwd_algo, input, weight, output=None, padding=0
     stride, padding, dilation, groups, verbose
   )
 
-def cudnn_find_convolution_fwd_algo(B, F, C, N, K, O, padding=0, stride=1, dilation=1, groups=1, verbose=False):
-  return cudnn_find_convolution_fwd_algo_(B, F, C, N, N, K, K, O, O, padding, stride, dilation, groups, verbose)
+def cudnn_find_convolution_fwd_algo(B, F, C, N, K, O, padding=0, stride=1, dilation=1, groups=1, channel_first=True, verbose=False):
+  return cudnn_find_convolution_fwd_algo_(B, F, C, N, N, K, K, O, O, padding, stride, dilation, groups, channel_first, verbose)
 
-def cudnn_find_convolution_fwd_algo_(B, F, C, H, W, KH, KW, OH, OW, padding=0, stride=1, dilation=1, groups=1, verbose=False):
+def cudnn_find_convolution_fwd_algo_(B, F, C, H, W, KH, KW, OH, OW, padding=0, stride=1, dilation=1, groups=1, channel_first=True, verbose=False):
   cudnn_convolution = __lazzy_load__(verbose)
 
   padding = __pair__(padding)
@@ -74,7 +74,7 @@ def cudnn_find_convolution_fwd_algo_(B, F, C, H, W, KH, KW, OH, OW, padding=0, s
   dilation = __pair__(dilation)
 
   algos = cudnn_convolution.find_fwd_algo(
-    B, F, C, H, W, KH, KW, OH, OW, stride, padding, dilation, groups, verbose
+    B, F, C, H, W, KH, KW, OH, OW, stride, padding, dilation, groups, channel_first, verbose
   )
 
   output = []
@@ -167,7 +167,6 @@ class CudnnConvBwdFilterAlgo(Enum):
 
   ## Look for the fastest method and try to uses it.
   FASTEST = -1
-  pass
 
 class CudnnConvBwdDataAlgo(Enum):
   ## This algorithm expresses the convolution as a sum of matrix products
