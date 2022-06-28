@@ -1,8 +1,9 @@
+import os
+import torch
+
 from enum import Enum
 from torch.utils.cpp_extension import load
 from pathlib import Path
-import os
-import torch
 
 __all__ = [
   'cudnn_convolution_fwd',
@@ -38,7 +39,7 @@ def __pair__(v):
   else:
     raise TypeError("Wrong Type")
 
-def cudnn_convolution_fwd(algo, B, F, C, N, K, O, padding, verbose=True):
+def cudnn_convolution_fwd(algo, B, F, C, N, K, O, padding, verbose=False):
   input  = torch.zeros(B, C, N, N).to('cuda')
   weight = torch.zeros(F, C, K, K).to('cuda')
   return cudnn_convolution_fwd_(algo, input, weight, padding=padding, verbose=verbose)
@@ -83,7 +84,7 @@ def cudnn_find_convolution_fwd_algo_(B, F, C, H, W, KH, KW, OH, OW, padding=0, s
     status = CudnnStatus(int(a[1]))
     time = float(a[2])
     memory = int(a[3])
-    output.append([algorithm, status, time, memory])
+    output.append([algorithm.name, algorithm.value, status.name, time, memory])
 
   return output
 

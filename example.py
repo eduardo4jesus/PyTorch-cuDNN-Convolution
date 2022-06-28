@@ -3,8 +3,8 @@ from torch.utils.cpp_extension import load
 from cudnn_convolution import *
 
 B, F, C = 256, 512, 128
-N, K, O = 32, 7, 32
-padding = 3
+N, K, O = 32, 3, 32
+padding = 1
 
 # output = cudnn_convolution_fwd(
 #   CudnnConvFwdAlgo.FASTEST,
@@ -13,10 +13,14 @@ padding = 3
 # )
 
 output = cudnn_find_convolution_fwd_algo_(
-  B, F, C, N, N, K, K, O, O, padding, verbose=True
+  B, F, C, N, N, K, K, O, O, padding, channel_first=True, verbose=True
 )
 
-print(output)
+output = cudnn_find_convolution_fwd_algo_(
+  B, F, C, N, N, K, K, O, O, padding, channel_first=False, verbose=True
+)
+
+# print(output)
 print("Done!")
 # # create dummy gradient w.r.t. the output
 # grad_output = torch.zeros(128, 64, 14, 14).to('cuda')
